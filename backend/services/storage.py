@@ -43,10 +43,15 @@ class SupabaseStorage:
             )
         self._base = settings.SUPABASE_URL.rstrip("/")
         self._bucket = settings.SUPABASE_STORAGE_BUCKET
-        self._headers = {
-            "Authorization": f"Bearer {settings.SUPABASE_SERVICE_KEY}",
-            "apikey": settings.SUPABASE_SERVICE_KEY,
-        }
+        # Authorization: Bearer alone is enough to authenticate against the
+        # Storage REST API with either key format. Deliberately NOT also
+        # sending an `apikey` header: Supabase's newer secret-key format
+        # (sb_secret_... -- the one replacing the legacy service_role key)
+        # has a browser-detection guard that rejects requests carrying the
+        # secret in `apikey`, since that header is the client-side/anon-key
+        # convention. Bearer-only works for both the legacy JWT service_role
+        # key and the new sb_secret_ format.
+        self._headers = {"Authorization": f"Bearer {settings.SUPABASE_SERVICE_KEY}"}
         self._client = http_client or httpx.Client(timeout=120.0)
 
     def upload(self, local_path: Path, remote_key: str) -> str:

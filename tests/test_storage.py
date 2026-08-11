@@ -72,7 +72,10 @@ def test_supabase_upload_returns_public_url(monkeypatch, tmp_path):
     called_url, kwargs = fake_client.calls[0]
     assert called_url == "https://xyz.supabase.co/storage/v1/object/content/variants/MASTER_001_V01.mp4"
     assert kwargs["headers"]["Authorization"] == "Bearer test-key"
-    # Never send tokens/keys anywhere except the Authorization/apikey headers.
+    # Must NOT also send the key via `apikey` -- Supabase's newer secret-key
+    # format (sb_secret_...) rejects requests that do, see storage.py comment.
+    assert "apikey" not in kwargs["headers"]
+    # Never send tokens/keys anywhere except the Authorization header.
     assert "test-key" not in called_url
 
 
