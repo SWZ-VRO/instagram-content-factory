@@ -1,0 +1,38 @@
+# --- Phase 1: API + DB ---
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+sqlalchemy==2.0.36
+alembic==1.14.0
+psycopg[binary]==3.2.3
+pydantic==2.10.4
+pydantic-settings==2.7.0
+cryptography==44.0.0
+python-multipart==0.0.20
+
+# --- Testing (httpx is also the real runtime HTTP client for the Meta
+# Graph API publisher -- backend/publishers/instagram_official.py, Phase 5) ---
+pytest==8.3.4
+httpx==0.28.1
+
+# --- Phase 4: scheduler ---
+# zoneinfo (stdlib) needs an IANA tz database to resolve names like
+# "Europe/Paris" -- Linux/macOS usually have one at the OS level, but
+# Windows never does, and even some minimal Docker base images strip it.
+# This package makes it work identically everywhere (§22 per-account tz).
+tzdata==2026.3
+
+# --- Phase 2: video pipeline ---
+# FFmpeg/ffprobe themselves are shelled out to directly (backend/services/
+# ffmpeg_runner.py) -- no ffmpeg-python wrapper needed, and it's installed
+# as a system package in backend/Dockerfile, not via pip.
+# The watcher (backend/workers/watcher.py) polls the filesystem rather than
+# using OS file-change events (watchdog/inotify): bind-mounted Docker
+# volumes on Windows/Mac frequently fail to propagate inotify events
+# reliably, and polling is simple, portable and good enough at this scale.
+imagehash==4.3.2
+Pillow==12.3.0
+
+# --- Phase 6+ (declared now so the image doesn't need rebuilding later;
+# not imported by any Phase 1/2 code path yet) ---
+celery==5.4.0
+redis==5.2.1

@@ -1,0 +1,14 @@
+# Netlify config for the dashboard (frontend/) in this monorepo.
+# https://docs.netlify.com/configure-builds/file-based-configuration/
+[build]
+  base = "frontend"
+  command = "npm run build"
+  publish = ".next"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+# Set in the Netlify UI (Site configuration > Environment variables), not
+# here: API_URL = the backend's Render URL (e.g.
+# https://instagram-content-factory-backend.onrender.com). See README
+# "Déploiement cloud gratuit".

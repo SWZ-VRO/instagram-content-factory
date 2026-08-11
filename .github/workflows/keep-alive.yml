@@ -1,0 +1,28 @@
+# Garde le backend Render (offre gratuite) réveillé en permanence en le
+# "pingant" plus souvent que son délai d'endormissement (15 min) -- sans
+# ça, le watcher et le Publishing Worker internes (qui tournent en threads
+# dans le même processus, voir backend/main.py) s'arrêteraient dès que le
+# service s'endort et ne publieraient plus rien à l'heure prévue.
+#
+# Nécessite un secret de dépôt nommé BACKEND_URL (Settings > Secrets and
+# variables > Actions), pointant vers l'URL Render du backend, ex:
+# https://instagram-content-factory-backend.onrender.com
+#
+# Limite honnête : les workflows planifiés de GitHub Actions ne sont pas
+# garantis à la minute près (ils peuvent être retardés de quelques minutes
+# en cas de forte charge sur l'infra de GitHub) -- suffisant pour cet
+# usage, mais pas une garantie absolue.
+name: Keep backend awake
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping /health
+        run: |
+          curl -sf "${{ secrets.BACKEND_URL }}/health" && echo "OK" || echo "Ping failed (service was probably cold-starting -- not fatal)"

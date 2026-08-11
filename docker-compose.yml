@@ -1,0 +1,66 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: icf
+      POSTGRES_PASSWORD: icf
+      POSTGRES_DB: icf
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U icf -d icf"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    # Not used yet -- the folder watcher and Publishing Worker (Phases 2/5)
+    # run as in-process threads, not Celery tasks. Declared now so Phase 6
+    # (Celery, real concurrency control at 100+ account scale) can be added
+    # without touching this file. Harmless to run idle.
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://icf:icf@postgres:5432/icf
+      REDIS_URL: redis://redis:6379/0
+      CONTENT_ROOT: /app/content
+    volumes:
+      - ./content:/app/content
+    ports:
+      - "8000:8000"
+    command: >
+      sh -c "alembic -c backend/alembic.ini upgrade head &&
+             uvicorn backend.main:app --host 0.0.0.0 --port 8000"
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      # Internal Docker network hostname -- this is read server-side inside
+      # the frontend container (Server Component), never by the browser.
+      API_URL: http://backend:8000
+    ports:
+      - "3000:3000"
+
+volumes:
+  postgres_data:

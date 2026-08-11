@@ -1,0 +1,20 @@
+.git
+.gitignore
+README.md
+run.ps1
+run.sh
+
+**/__pycache__
+**/*.pyc
+.venv/
+.venv_test/
+.pytest_cache/
+tests/
+
+frontend/node_modules
+frontend/.next
+
+# Content files are mounted as a volume at runtime (see docker-compose.yml),
+# never baked into an image -- keep them out of the build context entirely.
+content/**
+!content/**/.gitkeep

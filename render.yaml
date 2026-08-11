@@ -1,0 +1,56 @@
+# Render Blueprint (Infrastructure as Code) -- https://render.com/docs/blueprint-spec
+#
+# Defines the backend (API + watcher + Publishing Worker, all in one
+# process -- see backend/main.py) as a single free web service, built from
+# the existing backend/Dockerfile (same image Docker Compose uses locally).
+#
+# Fields marked `sync: false` are NOT stored here -- Render prompts for
+# them once, in its own dashboard, when you create the Blueprint. Never
+# put real secrets (passwords, keys) directly in this file.
+services:
+  - name: instagram-content-factory-backend
+    type: web
+    runtime: docker
+    plan: free
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: DEBUG
+        value: "false"
+
+      # Paste your Supabase connection string here, but change its
+      # prefix from "postgresql://" to "postgresql+psycopg://" -- see
+      # README "Déploiement cloud gratuit".
+      - key: DATABASE_URL
+        sync: false
+      - key: SECRET_KEY
+        sync: false
+
+      - key: CONTENT_ROOT
+        value: /app/content
+      - key: STORAGE_BACKEND
+        value: supabase
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: SUPABASE_STORAGE_BUCKET
+        value: content
+
+      # Stays true until you've connected a real Instagram account and
+      # are ready to publish for real -- see README "Instagram connection".
+      - key: DRY_RUN
+        value: "true"
+
+      # No local folder to watch on a host with no persistent disk --
+      # uploads go through POST /masters/upload instead (see the
+      # dashboard's Masters page).
+      - key: WATCHER_ENABLED
+        value: "false"
+      - key: PUBLISHING_WORKER_ENABLED
+        value: "true"
+      - key: PUBLISHING_POLL_INTERVAL_SECONDS
+        value: "30"
