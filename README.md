@@ -197,6 +197,45 @@ PostgreSQL (source de vérité)    workers/ (watcher, publishing_worker -- threa
 
 Structure : `backend/{api,services,models,repositories,workers,schedulers,publishers,validators}` — la logique métier ne vit jamais dans les routes API (voir chaque module pour le détail de sa responsabilité).
 
+## Déploiement cloud gratuit (Supabase + Render + Netlify)
+
+Alternative à Docker local : héberger l'app entièrement dans le cloud, gratuitement (avec une petite limite : le backend s'endort après 15 min d'inactivité sur l'offre gratuite Render, atténué par un ping automatique toutes les 10 min via GitHub Actions -- voir `.github/workflows/keep-alive.yml`).
+
+Répartition :
+- **Supabase** : base de données PostgreSQL + stockage des fichiers vidéo (bucket public, nécessaire car l'API Instagram récupère la vidéo via une URL HTTPS publique -- elle n'accepte pas d'upload direct).
+- **Render** (offre gratuite) : le moteur (API + watcher + Publishing Worker, définis dans `render.yaml`, construit depuis `backend/Dockerfile`).
+- **Netlify** : le tableau de bord (`frontend/`, config dans `netlify.toml`).
+- **GitHub** : héberge le code, sert de pont pour connecter Render et Netlify (déploiement automatique à chaque `git push`).
+
+### Étapes
+
+1. **Créer le dépôt GitHub** : sur https://github.com/new, crée un dépôt (public ou privé), puis :
+   ```bash
+   git remote add origin https://github.com/TON_USERNAME/instagram-content-factory.git
+   git push -u origin main
+   ```
+
+2. **Supabase** (https://supabase.com) :
+   - Nouveau projet → note le mot de passe de la base.
+   - Project Settings → Database → copie la **Connection string** (URI). Remplace `postgresql://` par `postgresql+psycopg://` au début -- c'est ta valeur `DATABASE_URL`.
+   - Project Settings → API → copie l'**URL** du projet (`SUPABASE_URL`) et la clé **service_role** (`SUPABASE_SERVICE_KEY`, secrète -- jamais côté frontend).
+   - Storage → New bucket → nom `content`, coche **Public bucket**.
+
+3. **Render** (https://render.com) :
+   - New → Blueprint → connecte ton dépôt GitHub → Render détecte `render.yaml` automatiquement.
+   - Quand demandé, colle `DATABASE_URL`, `SECRET_KEY` (génère-en un avec `python -c "import secrets; print(secrets.token_urlsafe(32))"`), `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`.
+   - Une fois déployé, note l'URL du service (ex: `https://instagram-content-factory-backend.onrender.com`).
+
+4. **GitHub Actions (garder le backend réveillé)** :
+   - Sur ton dépôt GitHub → Settings → Secrets and variables → Actions → New repository secret → nom `BACKEND_URL`, valeur = l'URL Render de l'étape 3.
+
+5. **Netlify** (https://netlify.com) :
+   - Add new site → Import from Git → ton dépôt → Netlify détecte `netlify.toml`.
+   - Site configuration → Environment variables → ajoute `API_URL` = l'URL Render de l'étape 3.
+   - Déploie → ton tableau de bord est en ligne.
+
+Après ça : tout se met à jour tout seul à chaque `git push`. Aucun de ces trois services ne tourne sur ton PC.
+
 ## Plan de phases
 
 - ✅ **Phase 1 — Foundation** : backend, frontend, DB, Docker, comptes/masters/variantes/captions (CRUD), unicité + cooldown testés.
