@@ -35,11 +35,22 @@ def import_captions_csv(db: Session, csv_text: str) -> list[Caption]:
     for row in reader:
         variant_code = row["variant_id"].strip()
         text = row["caption"]
+        if text is None:
+            # A row with fewer columns than the header lands here as None
+            # (csv.DictReader's default `restval`) rather than "" -- catch
+            # it explicitly for a clear message instead of a raw DB
+            # NOT NULL violation surfacing three layers down.
+            errors.append(f"'{variant_code}': missing caption value, skipped")
+            continue
         variant = variant_repo.get_by_code(db, variant_code)
         if variant is None:
             errors.append(f"unknown variant_id '{variant_code}', skipped")
             continue
-        attached.append(caption_pipeline.attach_caption_and_burn(db, variant_id=variant.id, text=text, source="csv"))
+        try:
+            attached.append(caption_pipeline.attach_caption_and_burn(db, variant_id=variant.id, text=text, source="csv"))
+        except Exception as exc:  # noqa: BLE001 -- one bad row (e.g. a DB constraint hit) must never abort the batch
+            db.rollback()
+            errors.append(f"{variant_code}: {exc}")
 
     if errors:
         # Rows that matched a known variant were already attached/committed

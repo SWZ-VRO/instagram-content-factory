@@ -235,9 +235,6 @@ def _fail(db: Session, post: ScheduledPost, variant: Variant | None, job: Publis
 def list_jobs(db: Session, *, limit: int = 200, offset: int = 0) -> list[dict]:
     """§34 Queue page: job_id, account, master/variant, scheduled_at,
     status, attempts, error -- one row per publishing_jobs entry."""
-    from backend.models.account import Account
-    from backend.models.variant import Variant
-
     stmt = (
         select(PublishingJob, ScheduledPost.scheduled_at_utc, Account.username, Variant.variant_code)
         .join(ScheduledPost, ScheduledPost.id == PublishingJob.scheduled_post_id)

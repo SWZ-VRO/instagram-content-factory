@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 
 from backend.api.deps import get_db
 from backend.api.schemas import ImportSummaryOut, MasterImportOutcomeOut, MasterSummaryOut
@@ -60,6 +61,12 @@ async def upload_master(file: UploadFile, db: Session = Depends(get_db)):
     same import pipeline as the watcher/IMPORT NOW, just fed by an
     uploaded file instead of a folder scan; no stability-check needed here
     since an HTTP upload is only "received" once fully read.
+
+    `import_one_master` is a heavy, fully synchronous call (ffmpeg
+    subprocesses, and in "supabase" storage mode a blocking HTTP upload) --
+    run via `run_in_threadpool` rather than awaited directly, so it doesn't
+    block this process's single asyncio event loop (and every other
+    in-flight request) for the whole duration of one video's processing.
     """
     filename = file.filename or "upload.mp4"
     settings.MASTERS_DIR.mkdir(parents=True, exist_ok=True)
@@ -71,7 +78,7 @@ async def upload_master(file: UploadFile, db: Session = Depends(get_db)):
         while chunk := await file.read(1024 * 1024):
             out.write(chunk)
 
-    outcome = import_one_master(db, destination)
+    outcome = await run_in_threadpool(import_one_master, db, destination)
     return MasterImportOutcomeOut(
         master_code=outcome.master_code, status=outcome.status, variants_created=outcome.variants_created, reasons=outcome.reasons
     )

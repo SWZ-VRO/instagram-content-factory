@@ -37,6 +37,13 @@ def check_master_integrity(path: Path) -> QCResult:
         probe = ffmpeg_runner.probe(path)
     except ffmpeg_runner.FFmpegError as exc:
         return QCResult(passed=False, reasons=[f"unreadable/corrupt media: {exc}"])
+    except ffmpeg_runner.FFmpegNotAvailable as exc:
+        # Distinct from "this file is bad" -- ffmpeg/ffprobe itself is
+        # missing. Still surfaced as a QC failure (so the file gets
+        # quarantined once, with a clear reason, instead of the watcher
+        # silently re-hammering the same file forever -- see
+        # master_import.py, which has no try/except around this call).
+        return QCResult(passed=False, reasons=[f"ffmpeg/ffprobe not available: {exc}"])
 
     if not probe.has_video_stream:
         reasons.append("no video stream found")
@@ -61,6 +68,8 @@ def check_variant_output(path: Path) -> QCResult:
         probe = ffmpeg_runner.probe(path)
     except ffmpeg_runner.FFmpegError as exc:
         return QCResult(passed=False, reasons=[f"generated variant is unreadable: {exc}"])
+    except ffmpeg_runner.FFmpegNotAvailable as exc:
+        return QCResult(passed=False, reasons=[f"ffmpeg/ffprobe not available: {exc}"])
     if not probe.has_video_stream or probe.duration_seconds <= 0:
         return QCResult(passed=False, reasons=["generated variant has no usable video stream"], probe=probe)
     return QCResult(passed=True, probe=probe)

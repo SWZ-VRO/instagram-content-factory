@@ -115,11 +115,25 @@ def test_correcting_an_already_available_variants_caption_does_not_reburn(db, mo
     assert called["n"] == 0  # re-burning an already-published-pipeline-ready variant is not done implicitly
 
 
-def test_supabase_backend_downloads_reburns_and_reuploads(db, monkeypatch):
+def _make_fake_storage(uploads: list) -> type:
+    class FakeStorage:
+        def upload(self, path, remote_key):
+            uploads.append(remote_key)
+            return f"https://fake.supabase.co/storage/v1/object/public/content/{remote_key}"
+
+    return FakeStorage
+
+
+def test_supabase_backend_downloads_when_no_local_copy_exists(db, monkeypatch):
+    """The scenario STORAGE_BACKEND=supabase exists for: no local disk (a
+    fresh/ephemeral host), so the file must come from its storage_url."""
     monkeypatch.setattr(settings, "STORAGE_BACKEND", "supabase")
-    variant = _make_variant_with_file(db)
-    variant.storage_url = "https://fake.supabase.co/storage/v1/object/public/content/variants/original.mp4"
+    master = make_master(db)
+    variant = make_variant(db, master, index=1, with_caption=False)
+    original_url = "https://fake.supabase.co/storage/v1/object/public/content/variants/original.mp4"
+    variant.storage_url = original_url
     db.commit()
+    assert not (settings.VARIANTS_DIR / variant.filename).exists()  # no local copy -- the case under test
 
     class FakeResp:
         content = b"downloaded original bytes"
@@ -127,25 +141,51 @@ def test_supabase_backend_downloads_reburns_and_reuploads(db, monkeypatch):
         def raise_for_status(self):
             pass
 
-    monkeypatch.setattr("backend.services.caption_pipeline.httpx.get", lambda url, timeout: FakeResp())
+    get_calls = []
+    monkeypatch.setattr(
+        "backend.services.caption_pipeline.httpx.get",
+        lambda url, timeout: (get_calls.append(url), FakeResp())[1],
+    )
     monkeypatch.setattr("backend.services.caption_pipeline.probe", lambda path: FAKE_PROBE)
     monkeypatch.setattr(
         "backend.services.caption_overlay.run_ffmpeg",
         lambda args, *, output_path: output_path.write_bytes(b"burned + reuploaded bytes"),
     )
 
-    uploads = []
-
-    class FakeStorage:
-        def upload(self, path, remote_key):
-            uploads.append(remote_key)
-            return f"https://fake.supabase.co/storage/v1/object/public/content/{remote_key}"
-
-    monkeypatch.setattr("backend.services.caption_pipeline.get_storage", lambda: FakeStorage())
+    uploads: list = []
+    monkeypatch.setattr("backend.services.caption_pipeline.get_storage", lambda: _make_fake_storage(uploads)())
 
     caption_pipeline.attach_caption_and_burn(db, variant_id=variant.id, text="Cloud caption.", source="txt")
 
     db.refresh(variant)
+    assert get_calls == [original_url]  # actually fetched the pre-burn file over the network
     assert variant.status == VariantStatus.AVAILABLE
     assert uploads == [f"variants/{variant.variant_code}.mp4"]
     assert variant.storage_url.endswith(f"variants/{variant.variant_code}.mp4")
+
+
+def test_supabase_backend_skips_download_when_local_copy_still_present(db, monkeypatch):
+    """Right after master_import.py generates+uploads a variant, the local
+    copy it wrote (to run ffmpeg against) is still on disk -- burning the
+    caption in the same process shouldn't pay for a redundant
+    upload-then-immediately-download round trip."""
+    monkeypatch.setattr(settings, "STORAGE_BACKEND", "supabase")
+    variant = _make_variant_with_file(db)  # writes a local copy
+    variant.storage_url = "https://fake.supabase.co/storage/v1/object/public/content/variants/original.mp4"
+    db.commit()
+
+    get_calls = []
+    monkeypatch.setattr("backend.services.caption_pipeline.httpx.get", lambda url, timeout: get_calls.append(url))
+    monkeypatch.setattr("backend.services.caption_pipeline.probe", lambda path: FAKE_PROBE)
+    monkeypatch.setattr(
+        "backend.services.caption_overlay.run_ffmpeg",
+        lambda args, *, output_path: output_path.write_bytes(b"burned bytes"),
+    )
+    uploads: list = []
+    monkeypatch.setattr("backend.services.caption_pipeline.get_storage", lambda: _make_fake_storage(uploads)())
+
+    caption_pipeline.attach_caption_and_burn(db, variant_id=variant.id, text="Cloud caption.", source="txt")
+
+    assert get_calls == []  # never touched the network to fetch what was already local
+    db.refresh(variant)
+    assert variant.status == VariantStatus.AVAILABLE

@@ -9,7 +9,7 @@ from pathlib import Path
 
 from backend.core.config import settings
 from backend.services import qc, transforms
-from backend.services.ffmpeg_runner import FFmpegError, ProbeResult, run_ffmpeg
+from backend.services.ffmpeg_runner import FFmpegError, FFmpegNotAvailable, ProbeResult, run_ffmpeg
 
 
 @dataclass
@@ -57,7 +57,13 @@ def generate_variants(
             successes.append(
                 GeneratedVariant(index=i, transform_name=spec.name, filepath=output_path, probe=result.probe)
             )
-        except FFmpegError as exc:
+        except (FFmpegError, FFmpegNotAvailable) as exc:
+            # FFmpegNotAvailable here means every remaining transform will
+            # fail identically (the binary is simply missing) -- still
+            # caught per-iteration rather than special-cased, matching this
+            # function's own contract ("a single transform failing never
+            # aborts the others") and keeping the failure reasons list
+            # complete for whoever reads master_import.py's outcome.
             output_path.unlink(missing_ok=True)
             failures.append(f"{spec.name}: {exc}")
 
