@@ -9,7 +9,8 @@ from io import StringIO
 from sqlalchemy.orm import Session
 
 from backend.models.caption import Caption
-from backend.repositories import caption_repo, variant_repo
+from backend.repositories import variant_repo
+from backend.services import caption_pipeline
 
 
 class CaptionImportError(Exception):
@@ -38,7 +39,7 @@ def import_captions_csv(db: Session, csv_text: str) -> list[Caption]:
         if variant is None:
             errors.append(f"unknown variant_id '{variant_code}', skipped")
             continue
-        attached.append(caption_repo.attach(db, variant_id=variant.id, text=text, source="csv"))
+        attached.append(caption_pipeline.attach_caption_and_burn(db, variant_id=variant.id, text=text, source="csv"))
 
     if errors:
         # Rows that matched a known variant were already attached/committed

@@ -131,8 +131,11 @@ def build_ffmpeg_args(input_path, plan: TransformPlan) -> list[str]:
     if plan.af:
         args += ["-af", plan.af]
     args += [
-        "-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-pix_fmt", "yuv420p",
-        "-c:a", "aac", "-b:a", "128k",
+        # CRF 18 ("visually lossless" for x264) + preset medium: prioritizes
+        # preserving quality over encode speed, per explicit request -- this
+        # runs as a background batch job, not something a user waits on live.
+        "-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p",
+        "-c:a", "aac", "-b:a", "192k",
         "-movflags", "+faststart",
     ]
     return args

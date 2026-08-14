@@ -110,6 +110,19 @@ class Settings(BaseSettings):
     # look similar by design and are never flagged against each other.
     PHASH_DUPLICATE_THRESHOLD: int = 6
 
+    # --- Caption burn-in (backend/services/caption_overlay.py) ---
+    # Once a caption is attached to a variant, its text is rendered onto the
+    # video itself -- bold white text on a dark rounded box, the native
+    # TikTok/Reels "typed on iPhone" caption look. DejaVu Sans Bold (see
+    # Dockerfile) is an open, redistributable stand-in for SF Pro Bold
+    # (Apple's font can't legally be bundled) -- visually a very close
+    # match: same humanist-sans proportions and weight.
+    CAPTION_OVERLAY_ENABLED: bool = True
+    CAPTION_FONT_PATH: str = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+    CAPTION_FONT_SIZE_RATIO: float = 0.045  # of video height
+    CAPTION_MAX_CHARS_PER_LINE: int = 26
+    CAPTION_MAX_LINES: int = 4
+
     # Background watcher (Phase 2's stand-in for the Celery-based worker
     # that arrives in Phase 6 -- see backend/workers/watcher.py).
     WATCHER_ENABLED: bool = True

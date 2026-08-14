@@ -31,6 +31,11 @@ os.environ["CONTENT_ROOT"] = str(Path(tempfile.gettempdir()) / f"icf_test_conten
 # otherwise touch the DB from a second thread outside test control.
 os.environ["WATCHER_ENABLED"] = "false"
 os.environ["PUBLISHING_WORKER_ENABLED"] = "false"
+# Caption burn-in needs a real ffmpeg (not installed here -- see README
+# "Tests"); off by default so the many tests that attach a caption in
+# passing aren't all required to mock the burn step. Exercised explicitly,
+# with ffmpeg mocked, in test_caption_pipeline.py / test_caption_overlay.py.
+os.environ["CAPTION_OVERLAY_ENABLED"] = "false"
 # Real value is 1s, meant to catch a file mid-copy in production; at that
 # speed it would add ~1s per file to every video-pipeline test.
 os.environ["FILE_STABILITY_CHECK_SECONDS"] = "0.01"

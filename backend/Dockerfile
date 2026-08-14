@@ -1,9 +1,12 @@
 FROM python:3.12-slim
 
-# ffmpeg is required from Phase 2 onward (variant generation); installed now
-# so the image doesn't need rebuilding when that phase lands.
+# ffmpeg: variant generation (§8-10). fonts-dejavu-core: bold sans-serif
+# font for burning captions onto video (backend/services/caption_overlay.py)
+# -- DejaVu Sans Bold is a clean, redistributable stand-in for the
+# iOS/TikTok-native caption look; Apple's own SF Pro isn't redistributable.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
+    fonts-dejavu-core \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

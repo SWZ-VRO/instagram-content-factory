@@ -20,8 +20,8 @@ from backend.core.config import settings
 from backend.models.enums import MasterStatus
 from backend.models.log import LogEntry
 from backend.models.master import Master
-from backend.repositories import caption_repo, master_repo, variant_repo
-from backend.services import hashing, qc
+from backend.repositories import master_repo, variant_repo
+from backend.services import caption_pipeline, hashing, qc
 from backend.services.storage import StorageError, get_storage
 from backend.services.variant_generator import generate_variants
 from backend.validators.content import is_supported_video_file
@@ -217,7 +217,7 @@ def import_one_master(db: Session, master_filepath: Path) -> MasterImportOutcome
 
             caption_text = _find_caption_text(variant_code)
             if caption_text:
-                caption_repo.attach(db, variant_id=variant.id, text=caption_text, source="txt")
+                caption_pipeline.attach_caption_and_burn(db, variant_id=variant.id, text=caption_text, source="txt")
 
             created += 1
 
