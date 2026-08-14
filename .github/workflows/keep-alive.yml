@@ -14,7 +14,7 @@
 # usage, mais pas une garantie absolue.
 name: Keep backend awake
 
-on:
+"on":
   schedule:
     - cron: "*/10 * * * *"
   workflow_dispatch: {}
