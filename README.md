@@ -102,9 +102,13 @@ curl -X POST http://localhost:8000/captions/import -F "file=@mes_captions.csv"
 ```
 Format TXT-par-fichier : dépose `content/captions/MASTER_001_V01.txt` avant (ou après, un futur import) que le master correspondant soit traité — le watcher/IMPORT NOW l'associe automatiquement.
 
+**Incrustation visuelle sur la vidéo** (`backend/services/caption_overlay.py`) : dès qu'une caption est associée à une variante, son texte est aussi incrusté directement sur la vidéo — texte blanc bold sur fond sombre semi-transparent, le style natif TikTok/Reels "tapé depuis l'iPhone" (police DejaVu Sans Bold, alternative ouverte à SF Pro qui n'est pas redistribuable). Seul un court extrait est affiché à l'écran (texte complet intact dans le vrai champ caption du post, jamais raccourci là) ; désactivable via `CAPTION_OVERLAY_ENABLED=false`. Une variante ne passe `AVAILABLE` qu'une fois l'incrustation réussie — si elle échoue, elle reste `MISSING_CAPTION` et l'erreur est loguée (`INVALID_MEDIA`), jamais publiée à moitié faite.
+
 ## 8. Génération des variantes — fonctionnel
 
-10 transformations fixes (`backend/services/transforms.py`), essayées dans l'ordre, en gardant celles qui réussissent et passent le contrôle qualité : `crop_center`, `crop_top_left`, `crop_bottom_right`, `zoom_in`, `reframe_vertical` (9:16), `mirror_horizontal`, `trim_skip_intro`, `trim_skip_outro`, `trim_middle_segment`, `speed_slight_up`. Un master échoue (`status=FAILED`) si moins de `MIN_VARIANTS` (5) variantes utilisables sont produites.
+10 transformations fixes (`backend/services/transforms.py`), essayées dans l'ordre, en gardant celles qui réussissent et passent le contrôle qualité : `crop_center`, `crop_top_left`, `crop_bottom_right`, `zoom_in`, `reframe_vertical` (9:16), `mirror_horizontal`, `trim_skip_intro`, `trim_skip_outro`, `trim_middle_segment`, `speed_slight_up`. Un master échoue (`status=FAILED`) si moins de `MIN_VARIANTS` (5) variantes utilisables sont produites. Encodage réglé pour préserver la qualité (CRF 18, preset medium) plutôt que la vitesse d'encodage.
+
+Sources de masters supportées : ComfyUI ou Higgsfield (ou toute autre vidéo) — le pipeline ne fait aucune distinction, dépose le fichier dans `content/masters/` ou envoie-le via le bouton Upload.
 
 ## 9. Connexion des comptes Instagram — fonctionnel (deux voies)
 
